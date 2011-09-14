@@ -248,6 +248,7 @@ extern PropertyInfo qdev_prop_blocksize;
         .defval    = (bool)_defval,                              \
         }
 
+
 #define DEFINE_PROP_UINT8(_n, _s, _f, _d)                       \
     DEFINE_PROP_DEFAULT(_n, _s, _f, _d, qdev_prop_uint8, uint8_t)
 #define DEFINE_PROP_UINT16(_n, _s, _f, _d)                      \
@@ -274,7 +275,7 @@ extern PropertyInfo qdev_prop_blocksize;
 #define DEFINE_PROP_STRING(_n, _s, _f)             \
     DEFINE_PROP(_n, _s, _f, qdev_prop_string, char*)
 #define DEFINE_PROP_NETDEV(_n, _s, _f)             \
-    DEFINE_PROP(_n, _s, _f, qdev_prop_netdev, VLANClientState*)
+    DEFINE_PROP(_n, _s, _f, qdev_prop_netdev, VLANClientState**)
 #define DEFINE_PROP_VLAN(_n, _s, _f)             \
     DEFINE_PROP(_n, _s, _f, qdev_prop_vlan, VLANState*)
 #define DEFINE_PROP_DRIVE(_n, _s, _f) \

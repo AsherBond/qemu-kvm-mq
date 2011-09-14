@@ -238,15 +238,32 @@ NICState *qemu_new_nic(NetClientInfo *info,
 {
     VLANClientState *nc;
     NICState *nic;
+    int i;
 
     assert(info->type == NET_CLIENT_TYPE_NIC);
     assert(info->size >= sizeof(NICState));
 
-    nc = qemu_new_net_client(info, conf->vlan, conf->peer, model, name);
+    if (conf->peers) {
+        nc = qemu_new_net_client(info, NULL, conf->peers[0], model, name);
+    } else {
+        nc = qemu_new_net_client(info, conf->vlan, NULL, model, name);
+    }
 
     nic = DO_UPCAST(NICState, nc, nc);
     nic->conf = conf;
     nic->opaque = opaque;
+
+    /* For compatiablity with single queue nic */
+    nic->ncs[0] = nc;
+    nc->opaque = nic;
+
+    for (i = 1 ; i < conf->queues; i++) {
+        VLANClientState *vc = qemu_new_net_client(info, NULL, conf->peers[i],
+                                                  model, name);
+        vc->opaque = nic;
+        nic->ncs[i] = vc;
+        vc->queue_index = i;
+    }
 
     return nic;
 }
@@ -283,11 +300,10 @@ void qemu_del_vlan_client(VLANClientState *vc)
 {
     /* If there is a peer NIC, delete and cleanup client, but do not free. */
     if (!vc->vlan && vc->peer && vc->peer->info->type == NET_CLIENT_TYPE_NIC) {
-        NICState *nic = DO_UPCAST(NICState, nc, vc->peer);
-        if (nic->peer_deleted) {
+        if (vc->peer_deleted) {
             return;
         }
-        nic->peer_deleted = true;
+        vc->peer_deleted = true;
         /* Let NIC know peer is gone. */
         vc->peer->link_down = true;
         if (vc->peer->info->link_status_changed) {
@@ -299,8 +315,7 @@ void qemu_del_vlan_client(VLANClientState *vc)
 
     /* If this is a peer NIC and peer has already been deleted, free it now. */
     if (!vc->vlan && vc->peer && vc->info->type == NET_CLIENT_TYPE_NIC) {
-        NICState *nic = DO_UPCAST(NICState, nc, vc);
-        if (nic->peer_deleted) {
+        if (vc->peer_deleted) {
             qemu_free_vlan_client(vc->peer);
         }
     }
@@ -342,14 +357,14 @@ void qemu_foreach_nic(qemu_nic_foreach func, void *opaque)
 
     QTAILQ_FOREACH(nc, &non_vlan_clients, next) {
         if (nc->info->type == NET_CLIENT_TYPE_NIC) {
-            func(DO_UPCAST(NICState, nc, nc), opaque);
+            func((NICState *)nc->opaque, opaque);
         }
     }
 
     QTAILQ_FOREACH(vlan, &vlans, next) {
         QTAILQ_FOREACH(nc, &vlan->clients, next) {
             if (nc->info->type == NET_CLIENT_TYPE_NIC) {
-                func(DO_UPCAST(NICState, nc, nc), opaque);
+                func((NICState *)nc->opaque, opaque);
             }
         }
     }
@@ -672,6 +687,26 @@ VLANClientState *qemu_find_netdev(const char *id)
     }
 
     return NULL;
+}
+
+int qemu_find_netdev_all(const char *id, VLANClientState **vcs, int max)
+{
+    VLANClientState *vc;
+    int ret = 0;
+
+    QTAILQ_FOREACH(vc, &non_vlan_clients, next) {
+        if (vc->info->type == NET_CLIENT_TYPE_NIC) {
+            continue;
+        }
+        if (!strcmp(vc->name, id) && ret < max) {
+            vcs[ret++] = vc;
+        }
+        if (ret >= max) {
+            break;
+        }
+    }
+
+    return ret;
 }
 
 static int nic_get_free_idx(void)
@@ -1275,22 +1310,27 @@ exit_err:
 
 void qmp_netdev_del(const char *id, Error **errp)
 {
-    VLANClientState *vc;
+    VLANClientState *vcs[MAX_QUEUE_NUM];
+    int queues, i;
 
-    vc = qemu_find_netdev(id);
-    if (!vc) {
+    queues = qemu_find_netdev_all(id, vcs, MAX_QUEUE_NUM);
+    if (queues == 0) {
         error_set(errp, QERR_DEVICE_NOT_FOUND, id);
         return;
     }
 
-    qemu_del_vlan_client(vc);
+    for (i = 0; i < queues; i++) {
+        /* FIXME: pointer check? */
+        qemu_del_vlan_client(vcs[i]);
+    }
     qemu_opts_del(qemu_opts_find(qemu_find_opts_err("netdev", errp), id));
 }
 
 static void print_net_client(Monitor *mon, VLANClientState *vc)
 {
-    monitor_printf(mon, "%s: type=%s,%s\n", vc->name,
-                   net_client_types[vc->info->type].type, vc->info_str);
+    monitor_printf(mon, "%s: type=%s,%s, queue=%d\n", vc->name,
+                   net_client_types[vc->info->type].type, vc->info_str,
+                   vc->queue_index);
 }
 
 void do_info_network(Monitor *mon)
@@ -1326,6 +1366,17 @@ void qmp_set_link(const char *name, bool up, Error **errp)
 {
     VLANState *vlan;
     VLANClientState *vc = NULL;
+    VLANClientState *vcs[MAX_QUEUE_NUM];
+    int queues, i;
+
+    queues = qemu_find_netdev_all(name, vcs, MAX_QUEUE_NUM);
+    if (queues) {
+	    for (i = 1; i < queues; i++) {
+		    vcs[i]->link_down = !up;
+	    }
+	    vc = vcs[0];
+	    goto done;
+    }
 
     QTAILQ_FOREACH(vlan, &vlans, next) {
         QTAILQ_FOREACH(vc, &vlan->clients, next) {

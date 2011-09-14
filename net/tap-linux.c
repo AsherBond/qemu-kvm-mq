@@ -74,11 +74,8 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
         pstrcpy(ifr.ifr_name, IFNAMSIZ, ifname);
     else
         pstrcpy(ifr.ifr_name, IFNAMSIZ, "tap%d");
-    if (attach) {
-        ifr.ifr_flags |= IFF_ATTACH_QUEUE;
-        ret = ioctl(fd, TUNSETQUEUE, (void *) &ifr);
-    } else
-        ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
+
+    ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
     if (ret != 0) {
         if (ifname[0] != '\0') {
             error_report("could not configure %s (%s): %m", PATH_NET_TUN, ifr.ifr_name);

@@ -473,7 +473,7 @@ void mcf_fec_init(MemoryRegion *sysmem, NICInfo *nd,
 
     s->conf.macaddr = nd->macaddr;
     s->conf.vlan = nd->vlan;
-    s->conf.peer = nd->netdev;
+    s->conf.peers[0] = nd->netdev;
 
     s->nic = qemu_new_nic(&net_mcf_fec_info, &s->conf, nd->model, nd->name, s);
 

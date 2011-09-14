@@ -12,20 +12,24 @@ struct MACAddr {
     uint8_t a[6];
 };
 
+#define MAX_QUEUE_NUM 32
+
 /* qdev nic properties */
 
 typedef struct NICConf {
     MACAddr macaddr;
     VLANState *vlan;
-    VLANClientState *peer;
+    VLANClientState **peers;
     int32_t bootindex;
+    int32_t queues;
 } NICConf;
 
 #define DEFINE_NIC_PROPERTIES(_state, _conf)                            \
     DEFINE_PROP_MACADDR("mac",   _state, _conf.macaddr),                \
     DEFINE_PROP_VLAN("vlan",     _state, _conf.vlan),                   \
-    DEFINE_PROP_NETDEV("netdev", _state, _conf.peer),                   \
-    DEFINE_PROP_INT32("bootindex", _state, _conf.bootindex, -1)
+    DEFINE_PROP_NETDEV("netdev", _state, _conf.peers),                   \
+    DEFINE_PROP_INT32("bootindex", _state, _conf.bootindex, -1),        \
+    DEFINE_PROP_INT32("queues", _state, _conf.queues, 1)
 
 /* VLANs support */
 
@@ -72,13 +76,16 @@ struct VLANClientState {
     char *name;
     char info_str[256];
     unsigned receive_disabled : 1;
+    unsigned int queue_index;
+    bool peer_deleted;
+    void *opaque;
 };
 
 typedef struct NICState {
     VLANClientState nc;
+    VLANClientState *ncs[MAX_QUEUE_NUM];
     NICConf *conf;
     void *opaque;
-    bool peer_deleted;
 } NICState;
 
 struct VLANState {
@@ -90,6 +97,7 @@ struct VLANState {
 
 VLANState *qemu_find_vlan(int id, int allocate);
 VLANClientState *qemu_find_netdev(const char *id);
+int qemu_find_netdev_all(const char *id, VLANClientState **vcs, int max);
 VLANClientState *qemu_new_net_client(NetClientInfo *info,
                                      VLANState *vlan,
                                      VLANClientState *peer,

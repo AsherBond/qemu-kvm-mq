@@ -554,16 +554,38 @@ PropertyInfo qdev_prop_chr = {
 
 static int parse_netdev(DeviceState *dev, const char *str, void **ptr)
 {
-    VLANClientState *netdev = qemu_find_netdev(str);
+    VLANClientState ***nc = (VLANClientState ***)ptr;
+    VLANClientState *vcs[MAX_QUEUE_NUM];
+    int queues, i = 0;
+    int ret;
 
-    if (netdev == NULL) {
-        return -ENOENT;
+    *nc = g_malloc(MAX_QUEUE_NUM * sizeof(VLANClientState *));
+    queues = qemu_find_netdev_all(str, vcs, MAX_QUEUE_NUM);
+    if (queues == 0) {
+        ret = -ENOENT;
+        goto err;
     }
-    if (netdev->peer) {
-        return -EEXIST;
+
+    for (i = 0; i < queues; i++) {
+        if (vcs[i] == NULL) {
+            ret = -ENOENT;
+            goto err;
+        }
+
+        if (vcs[i]->peer) {
+            ret = -EEXIST;
+            goto err;
+        }
+
+        (*nc)[i] = vcs[i];
+	vcs[i]->queue_index = i;
     }
-    *ptr = netdev;
+
     return 0;
+
+err:
+    g_free(*nc);
+    return ret;
 }
 
 static const char *print_netdev(void *ptr)

@@ -290,7 +290,7 @@ static void tap_cleanup(VLANClientState *nc)
 
     qemu_purge_queued_packets(nc);
 
-    if (s->down_script[0])
+    if (s->down_script[0] && nc->queue_index == 0)
         launch_script(s->down_script, s->down_script_arg, s->fd);
 
     tap_read_poll(s, 0);

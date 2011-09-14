@@ -900,7 +900,7 @@ void dp83932_init(NICInfo *nd, target_phys_addr_t base, int it_shift,
 
     s->conf.macaddr = nd->macaddr;
     s->conf.vlan = nd->vlan;
-    s->conf.peer = nd->netdev;
+    s->conf.peers[0] = nd->netdev;
 
     s->nic = qemu_new_nic(&net_dp83932_info, &s->conf, nd->model, nd->name, s);
 
