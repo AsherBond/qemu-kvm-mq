@@ -545,6 +545,25 @@ static QemuOpt *qemu_opt_find(QemuOpts *opts, const char *name)
     return NULL;
 }
 
+int qemu_opt_get_all(QemuOpts *opts, const char *name, const char **optp,
+                     int max)
+{
+    QemuOpt *opt;
+    int index = 0;
+
+    QTAILQ_FOREACH_REVERSE(opt, &opts->head, QemuOptHead, next) {
+        if (strcmp(opt->name, name) == 0) {
+            if (index < max) {
+                optp[index++] = opt->str;
+            }
+            if (index == max) {
+                break;
+            }
+        }
+    }
+    return index;
+}
+
 const char *qemu_opt_get(QemuOpts *opts, const char *name)
 {
     QemuOpt *opt = qemu_opt_find(opts, name);

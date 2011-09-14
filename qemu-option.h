@@ -106,6 +106,8 @@ struct QemuOptsList {
     QemuOptDesc desc[];
 };
 
+int qemu_opt_get_all(QemuOpts *opts, const char *name, const char **optp,
+                     int max);
 const char *qemu_opt_get(QemuOpts *opts, const char *name);
 bool qemu_opt_get_bool(QemuOpts *opts, const char *name, bool defval);
 uint64_t qemu_opt_get_number(QemuOpts *opts, const char *name, uint64_t defval);
