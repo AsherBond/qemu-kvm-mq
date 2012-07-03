@@ -620,11 +620,12 @@ static int vhost_virtqueue_init(struct vhost_dev *dev,
 {
     target_phys_addr_t s, l, a;
     int r;
+    int vhost_vq_index = (idx > 2 ? idx - 1 : idx) % dev->nvqs;
     struct vhost_vring_file file = {
-        .index = idx,
+        .index = vhost_vq_index
     };
     struct vhost_vring_state state = {
-        .index = idx,
+        .index = vhost_vq_index
     };
     struct VirtQueue *vvq = virtio_get_queue(vdev, idx);
 
@@ -670,11 +671,12 @@ static int vhost_virtqueue_init(struct vhost_dev *dev,
         goto fail_alloc_ring;
     }
 
-    r = vhost_virtqueue_set_addr(dev, vq, idx, dev->log_enabled);
+    r = vhost_virtqueue_set_addr(dev, vq, vhost_vq_index, dev->log_enabled);
     if (r < 0) {
         r = -errno;
         goto fail_alloc;
     }
+
     file.fd = event_notifier_get_fd(virtio_queue_get_host_notifier(vvq));
     r = ioctl(dev->control, VHOST_SET_VRING_KICK, &file);
     if (r) {
@@ -715,7 +717,7 @@ static void vhost_virtqueue_cleanup(struct vhost_dev *dev,
                                     unsigned idx)
 {
     struct vhost_vring_state state = {
-        .index = idx,
+        .index = (idx > 2 ? idx - 1 : idx) % dev->nvqs,
     };
     int r;
     r = ioctl(dev->control, VHOST_GET_VRING_BASE, &state);
@@ -829,7 +831,9 @@ int vhost_dev_enable_notifiers(struct vhost_dev *hdev, VirtIODevice *vdev)
     }
 
     for (i = 0; i < hdev->nvqs; ++i) {
-        r = vdev->binding->set_host_notifier(vdev->binding_opaque, i, true);
+        r = vdev->binding->set_host_notifier(vdev->binding_opaque,
+					     hdev->vq_index + i,
+					     true);
         if (r < 0) {
             fprintf(stderr, "vhost VQ %d notifier binding failed: %d\n", i, -r);
             goto fail_vq;
@@ -839,7 +843,9 @@ int vhost_dev_enable_notifiers(struct vhost_dev *hdev, VirtIODevice *vdev)
     return 0;
 fail_vq:
     while (--i >= 0) {
-        r = vdev->binding->set_host_notifier(vdev->binding_opaque, i, false);
+        r = vdev->binding->set_host_notifier(vdev->binding_opaque,
+					     hdev->vq_index + i,
+					     false);
         if (r < 0) {
             fprintf(stderr, "vhost VQ %d notifier cleanup error: %d\n", i, -r);
             fflush(stderr);
@@ -860,7 +866,9 @@ void vhost_dev_disable_notifiers(struct vhost_dev *hdev, VirtIODevice *vdev)
     int i, r;
 
     for (i = 0; i < hdev->nvqs; ++i) {
-        r = vdev->binding->set_host_notifier(vdev->binding_opaque, i, false);
+        r = vdev->binding->set_host_notifier(vdev->binding_opaque,
+                                             hdev->vq_index + i,
+                                             false);
         if (r < 0) {
             fprintf(stderr, "vhost VQ %d notifier cleanup failed: %d\n", i, -r);
             fflush(stderr);
@@ -879,10 +887,12 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev)
         goto fail;
     }
 
-    r = vdev->binding->set_guest_notifiers(vdev->binding_opaque, true);
-    if (r < 0) {
-        fprintf(stderr, "Error binding guest notifier: %d\n", -r);
-        goto fail_notifiers;
+    if (hdev->vq_index == 0) {
+        r = vdev->binding->set_guest_notifiers(vdev->binding_opaque, true);
+        if (r < 0) {
+            fprintf(stderr, "Error binding guest notifier: %d\n", -r);
+            goto fail_notifiers;
+        }
     }
 
     r = vhost_dev_set_features(hdev, hdev->log_enabled);
@@ -898,7 +908,7 @@ int vhost_dev_start(struct vhost_dev *hdev, VirtIODevice *vdev)
         r = vhost_virtqueue_init(hdev,
                                  vdev,
                                  hdev->vqs + i,
-                                 i);
+                                 hdev->vq_index + i);
         if (r < 0) {
             goto fail_vq;
         }
@@ -925,8 +935,9 @@ fail_vq:
         vhost_virtqueue_cleanup(hdev,
                                 vdev,
                                 hdev->vqs + i,
-                                i);
+                                hdev->vq_index + i);
     }
+    i = hdev->nvqs;
 fail_mem:
 fail_features:
     vdev->binding->set_guest_notifiers(vdev->binding_opaque, false);
@@ -944,18 +955,22 @@ void vhost_dev_stop(struct vhost_dev *hdev, VirtIODevice *vdev)
         vhost_virtqueue_cleanup(hdev,
                                 vdev,
                                 hdev->vqs + i,
-                                i);
+                                hdev->vq_index + i);
     }
+
     for (i = 0; i < hdev->n_mem_sections; ++i) {
         vhost_sync_dirty_bitmap(hdev, &hdev->mem_sections[i],
                                 0, (target_phys_addr_t)~0x0ull);
     }
-    r = vdev->binding->set_guest_notifiers(vdev->binding_opaque, false);
-    if (r < 0) {
-        fprintf(stderr, "vhost guest notifier cleanup failed: %d\n", r);
-        fflush(stderr);
+
+    if (hdev->vq_index == 0) {
+	r = vdev->binding->set_guest_notifiers(vdev->binding_opaque, false);
+	if (r < 0) {
+	    fprintf(stderr, "vhost guest notifier cleanup failed: %d\n", r);
+	    fflush(stderr);
+	}
+	assert (r >= 0);
     }
-    assert (r >= 0);
 
     hdev->started = false;
     g_free(hdev->log);

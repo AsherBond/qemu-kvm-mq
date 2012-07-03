@@ -138,13 +138,15 @@ bool vhost_net_query(VHostNetState *net, VirtIODevice *dev)
 }
 
 int vhost_net_start(struct vhost_net *net,
-                    VirtIODevice *dev)
+                    VirtIODevice *dev,
+                    int vq_index)
 {
     struct vhost_vring_file file = { };
     int r;
 
     net->dev.nvqs = 2;
     net->dev.vqs = net->vqs;
+    net->dev.vq_index = vq_index;
 
     r = vhost_dev_enable_notifiers(&net->dev, dev);
     if (r < 0) {
@@ -227,7 +229,8 @@ bool vhost_net_query(VHostNetState *net, VirtIODevice *dev)
 }
 
 int vhost_net_start(struct vhost_net *net,
-		    VirtIODevice *dev)
+                    VirtIODevice *dev,
+		int vq_index)
 {
     return -ENOSYS;
 }
