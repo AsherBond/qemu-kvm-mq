@@ -763,6 +763,7 @@ int tap_detach(VLANClientState *nc)
     if (s->enabled == 0) {
         return 0;
     } else {
+        qemu_purge_queued_packets(nc);
         ret = tap_fd_detach(s->fd, s->ifname);
         if (ret == 0) {
             s->enabled = 0;

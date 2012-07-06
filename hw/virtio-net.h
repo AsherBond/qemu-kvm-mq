@@ -44,6 +44,7 @@
 #define VIRTIO_NET_F_CTRL_RX    18      /* Control channel RX mode support */
 #define VIRTIO_NET_F_CTRL_VLAN  19      /* Control channel VLAN filtering */
 #define VIRTIO_NET_F_CTRL_RX_EXTRA 20   /* Extra RX mode control support */
+#define VIRTIO_NET_F_MULTIQUEUE   22
 
 #define VIRTIO_NET_S_LINK_UP    1       /* Link is up */
 
@@ -72,6 +73,8 @@ struct virtio_net_config
     uint8_t mac[ETH_ALEN];
     /* See VIRTIO_NET_F_STATUS and VIRTIO_NET_S_* above */
     uint16_t status;
+
+    uint16_t queues;
 } QEMU_PACKED;
 
 /* This is the first element of the scatter-gather list.  If you don't
@@ -167,6 +170,15 @@ struct virtio_net_ctrl_mac {
 #define VIRTIO_NET_CTRL_VLAN       2
  #define VIRTIO_NET_CTRL_VLAN_ADD             0
  #define VIRTIO_NET_CTRL_VLAN_DEL             1
+
+/* Control Multiqueue
+ *
+ */
+struct virtio_net_ctrl_multiqueue {
+    uint16_t num_queue_pairs;
+};
+#define VIRTIO_NET_CTRL_MULTIQUEUE    4
+ #define VIRTIO_NET_CTRL_MULTIQUEUE_QNUM        0
 
 #define DEFINE_VIRTIO_NET_FEATURES(_state, _field) \
         DEFINE_VIRTIO_COMMON_FEATURES(_state, _field), \
