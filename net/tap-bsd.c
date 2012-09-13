@@ -33,7 +33,8 @@
 #include <net/if_tap.h>
 #endif
 
-int tap_open(char *ifname, int ifname_size, int *vnet_hdr, int vnet_hdr_required)
+int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
+             int vnet_hdr_required, int attach)
 {
     int fd;
 #ifdef TAPGIFNAME
@@ -122,6 +123,11 @@ int tap_set_sndbuf(int fd, QemuOpts *opts)
     return 0;
 }
 
+int tap_get_ifname(int fd, char *ifname);
+{
+    return 0;
+}
+
 int tap_probe_vnet_hdr(int fd)
 {
     return 0;
@@ -144,4 +150,14 @@ void tap_fd_set_vnet_hdr_len(int fd, int len)
 void tap_fd_set_offload(int fd, int csum, int tso4,
                         int tso6, int ecn, int ufo)
 {
+}
+
+int tap_fd_attach(int fd, const char *ifname)
+{
+    return -1;
+}
+
+int tap_fd_detach(int fd, const char *ifname)
+{
+    return -1;
 }

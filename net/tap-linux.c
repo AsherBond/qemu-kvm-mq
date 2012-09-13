@@ -35,7 +35,8 @@
 
 #define PATH_NET_TUN "/dev/net/tun"
 
-int tap_open(char *ifname, int ifname_size, int *vnet_hdr, int vnet_hdr_required)
+int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
+             int vnet_hdr_required, int attach)
 {
     struct ifreq ifr;
     int fd, ret;
@@ -47,6 +48,8 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr, int vnet_hdr_required
     }
     memset(&ifr, 0, sizeof(ifr));
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
+    if (!attach)
+        ifr.ifr_flags |= IFF_MULTI_QUEUE;
 
     if (*vnet_hdr) {
         unsigned int features;
@@ -71,7 +74,11 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr, int vnet_hdr_required
         pstrcpy(ifr.ifr_name, IFNAMSIZ, ifname);
     else
         pstrcpy(ifr.ifr_name, IFNAMSIZ, "tap%d");
-    ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
+    if (attach) {
+        ifr.ifr_flags |= IFF_ATTACH_QUEUE;
+        ret = ioctl(fd, TUNSETQUEUE, (void *) &ifr);
+    } else
+        ret = ioctl(fd, TUNSETIFF, (void *) &ifr);
     if (ret != 0) {
         if (ifname[0] != '\0') {
             error_report("could not configure %s (%s): %m", PATH_NET_TUN, ifr.ifr_name);
@@ -111,6 +118,19 @@ int tap_set_sndbuf(int fd, QemuOpts *opts)
         error_report("TUNSETSNDBUF ioctl failed: %s", strerror(errno));
         return -1;
     }
+    return 0;
+}
+
+int tap_get_ifname(int fd, char *ifname)
+{
+    struct ifreq ifr;
+
+    if (ioctl(fd, TUNGETIFF, &ifr) != 0) {
+        error_report("TUNGETIFF ioctl() failed: %s", strerror(errno));
+        return -1;
+    }
+
+    pstrcpy(ifname, sizeof(ifr.ifr_name), ifr.ifr_name);
     return 0;
 }
 
@@ -197,3 +217,48 @@ void tap_fd_set_offload(int fd, int csum, int tso4,
         }
     }
 }
+
+/* Attach a file descriptor to a TUN/TAP device. This descriptor should be
+ * detached before.
+ */
+int tap_fd_attach(int fd, const char *ifname)
+{
+    struct ifreq ifr;
+    int ret;
+
+    memset(&ifr, 0, sizeof(ifr));
+
+    ifr.ifr_flags = IFF_TAP | IFF_NO_PI | IFF_VNET_HDR | IFF_ATTACH_QUEUE;
+    pstrcpy(ifr.ifr_name, IFNAMSIZ, ifname);
+
+    ret = ioctl(fd, TUNSETQUEUE, (void *) &ifr);
+
+    if (ret != 0) {
+        error_report("could not attach to %s", ifname);
+    }
+
+    return ret;
+}
+
+/* Detach a file descriptor to a TUN/TAP device. This file descriptor must have
+ * been attach to a device.
+ */
+int tap_fd_detach(int fd, const char *ifname)
+{
+    struct ifreq ifr;
+    int ret;
+
+    memset(&ifr, 0, sizeof(ifr));
+
+    ifr.ifr_flags = IFF_TAP | IFF_NO_PI | IFF_VNET_HDR | IFF_DETACH_QUEUE;
+    pstrcpy(ifr.ifr_name, IFNAMSIZ, ifname);
+
+    ret = ioctl(fd, TUNSETQUEUE, (void *) &ifr);
+
+    if (ret != 0) {
+        error_report("could not detach to %s", ifname);
+    }
+
+    return ret;
+}
+

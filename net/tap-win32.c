@@ -749,3 +749,14 @@ struct vhost_net *tap_get_vhost_net(VLANClientState *nc)
 {
     return NULL;
 }
+
+int tap_attach(VLANClientState *nc)
+{
+    return -1;
+}
+
+int tap_detach(VLANClientState *nc)
+{
+    return -1;
+}
+

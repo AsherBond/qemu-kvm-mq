@@ -978,6 +978,10 @@ static const struct {
                 .name = "vhostforce",
                 .type = QEMU_OPT_BOOL,
                 .help = "force vhost on for non-MSIX virtio guests",
+            }, {
+                .name = "queues",
+                .type = QEMU_OPT_NUMBER,
+                .help = "number of queues the backend can provides",
         },
 #endif /* _WIN32 */
             { /* end of list */ }
