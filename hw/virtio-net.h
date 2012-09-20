@@ -74,7 +74,7 @@ struct virtio_net_config
     /* See VIRTIO_NET_F_STATUS and VIRTIO_NET_S_* above */
     uint16_t status;
 
-    uint16_t queues;
+    uint16_t max_virtqueue_pairs;
 } QEMU_PACKED;
 
 /* This is the first element of the scatter-gather list.  If you don't
@@ -171,14 +171,20 @@ struct virtio_net_ctrl_mac {
  #define VIRTIO_NET_CTRL_VLAN_ADD             0
  #define VIRTIO_NET_CTRL_VLAN_DEL             1
 
-/* Control Multiqueue
+/* Control Multiqueue Steering
  *
  */
-struct virtio_net_ctrl_multiqueue {
-    uint16_t num_queue_pairs;
+struct virtio_net_ctrl_steering {
+    uint8_t current_steering_rule;
+    uint8_t reserved;
+    uint16_t current_steering_param;
 };
-#define VIRTIO_NET_CTRL_MULTIQUEUE    4
- #define VIRTIO_NET_CTRL_MULTIQUEUE_QNUM        0
+#define VIRTIO_NET_CTRL_STEERING    4
+ #define VIRTIO_NET_CTRL_STEERING_SET    0
+
+#define VIRTIO_NET_CTRL_STEERING_SINGLE        0
+#define VIRTIO_NET_CTRL_STEERING_RX_FOLLOWS_TX 1
+
 
 #define DEFINE_VIRTIO_NET_FEATURES(_state, _field) \
         DEFINE_VIRTIO_COMMON_FEATURES(_state, _field), \

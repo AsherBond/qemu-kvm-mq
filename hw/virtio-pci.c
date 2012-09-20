@@ -690,8 +690,9 @@ static int virtio_pci_set_guest_notifiers(void *opaque, bool assign)
             break;
         }
 
-	if (virtio_queue_is_reserved(vdev, n))
+	if (virtio_queue_is_reserved(vdev, n)) {
             continue;
+        }
 
         r = virtio_pci_set_guest_notifier(opaque, n, assign);
         if (r < 0) {
