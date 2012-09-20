@@ -633,6 +633,11 @@ int virtio_queue_get_num(VirtIODevice *vdev, int n)
     return vdev->vq[n].vring.num;
 }
 
+bool virtio_queue_is_reserved(VirtIODevice *vdev, int n)
+{
+    return vdev->vq[n].handle_output == NULL;
+}
+
 int virtio_queue_get_id(VirtQueue *vq)
 {
     VirtIODevice *vdev = vq->vdev;
@@ -645,7 +650,8 @@ void virtio_queue_notify_vq(VirtQueue *vq)
     if (vq->vring.desc) {
         VirtIODevice *vdev = vq->vdev;
         trace_virtio_queue_notify(vdev, vq - vdev->vq, vq);
-        vq->handle_output(vdev, vq);
+        if (vq->handle_output)
+            vq->handle_output(vdev, vq);
     }
 }
 
