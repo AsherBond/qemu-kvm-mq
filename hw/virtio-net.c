@@ -352,7 +352,7 @@ static uint32_t virtio_net_get_features(VirtIODevice *vdev, uint32_t features)
     VirtIONet *n = to_virtio_net(vdev);
 
     features |= (1 << VIRTIO_NET_F_MAC);
-    features |= (1 << VIRTIO_NET_F_MULTIQUEUE);
+    features |= (1 << VIRTIO_NET_F_RFS);
 
     if (peer_has_vnet_hdr(n)) {
         int i;
@@ -408,7 +408,7 @@ static void virtio_net_set_features(VirtIODevice *vdev, uint32_t features)
     int i;
 
     n->mergeable_rx_bufs = !!(features & (1 << VIRTIO_NET_F_MRG_RXBUF));
-    n->multiqueue = !!(features & (1 << VIRTIO_NET_F_MULTIQUEUE));
+    n->multiqueue = !!(features & (1 << VIRTIO_NET_F_RFS));
 
     if (!n->multiqueue)
 	    n->real_queues = 1;
@@ -549,42 +549,24 @@ static int virtio_net_handle_vlan_table(VirtIONet *n, uint8_t cmd,
     return VIRTIO_NET_OK;
 }
 
-static int virtio_net_handle_steering(VirtIONet *n, uint8_t cmd,
-                                      VirtQueueElement *elem)
+static int virtio_net_handle_rfs(VirtIONet *n, uint8_t cmd,
+                                 VirtQueueElement *elem)
 {
-    struct virtio_net_ctrl_steering s;
+    struct virtio_net_ctrl_rfs s;
 
     if (elem->out_num != 2 ||
-        elem->out_sg[1].iov_len != sizeof(struct virtio_net_ctrl_steering)) {
+        elem->out_sg[1].iov_len != sizeof(struct virtio_net_ctrl_rfs)) {
         error_report("virtio-net ctrl invalid steering command");
         return VIRTIO_NET_ERR;
     }
 
-    if (cmd != VIRTIO_NET_CTRL_STEERING_SET) {
+    if (cmd != VIRTIO_NET_CTRL_RFS_VQ_PAIRS_SET) {
         return VIRTIO_NET_ERR;
     }
 
     memcpy(&s, elem->out_sg[1].iov_base,
-           sizeof(struct virtio_net_ctrl_steering));
-
-    switch (s.current_steering_rule) {
-    case VIRTIO_NET_CTRL_STEERING_SINGLE:
-	    n->real_queues = 1;
-	    VIRTNET_DBG("Single steering policy\n");
-	    break;
-    case VIRTIO_NET_CTRL_STEERING_RX_FOLLOWS_TX:
-	    if (s.current_steering_param == 1 &&
-		s.current_steering_param > n->queues)
-                return VIRTIO_NET_ERR;
-            n->real_queues = s.current_steering_param;
-	    VIRTNET_DBG("Rx follows tx sterring policy, queues %d\n",
-		        n->real_queues);
-            break;
-    default:
-        error_report("unknown steering command");
-        return VIRTIO_NET_ERR;
-    }
-
+           sizeof(struct virtio_net_ctrl_rfs));
+    n->real_queues = s.virtqueue_pairs;
     virtio_net_set_status(&n->vdev, n->vdev.status);
 
     return VIRTIO_NET_OK;
@@ -618,8 +600,8 @@ static void virtio_net_handle_ctrl(VirtIODevice *vdev, VirtQueue *vq)
             status = virtio_net_handle_mac(n, ctrl.cmd, &elem);
         else if (ctrl.class == VIRTIO_NET_CTRL_VLAN)
             status = virtio_net_handle_vlan_table(n, ctrl.cmd, &elem);
-        else if (ctrl.class == VIRTIO_NET_CTRL_STEERING)
-            status = virtio_net_handle_steering(n, ctrl.cmd, &elem);
+        else if (ctrl.class == VIRTIO_NET_CTRL_RFS)
+            status = virtio_net_handle_rfs(n, ctrl.cmd, &elem);
 
         stb_p(elem.in_sg[elem.in_num - 1].iov_base, status);
 

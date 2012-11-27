@@ -44,7 +44,7 @@
 #define VIRTIO_NET_F_CTRL_RX    18      /* Control channel RX mode support */
 #define VIRTIO_NET_F_CTRL_VLAN  19      /* Control channel VLAN filtering */
 #define VIRTIO_NET_F_CTRL_RX_EXTRA 20   /* Extra RX mode control support */
-#define VIRTIO_NET_F_MULTIQUEUE   22
+#define VIRTIO_NET_F_RFS        22      /* Device has multiple rx/tx queues */
 
 #define VIRTIO_NET_S_LINK_UP    1       /* Link is up */
 
@@ -171,20 +171,18 @@ struct virtio_net_ctrl_mac {
  #define VIRTIO_NET_CTRL_VLAN_ADD             0
  #define VIRTIO_NET_CTRL_VLAN_DEL             1
 
-/* Control Multiqueue Steering
+/*
+ * Control RFS settings.
  *
  */
-struct virtio_net_ctrl_steering {
-    uint8_t current_steering_rule;
-    uint8_t reserved;
-    uint16_t current_steering_param;
+struct virtio_net_ctrl_rfs {
+    uint16_t virtqueue_pairs;
 };
-#define VIRTIO_NET_CTRL_STEERING    4
- #define VIRTIO_NET_CTRL_STEERING_SET    0
 
-#define VIRTIO_NET_CTRL_STEERING_SINGLE        0
-#define VIRTIO_NET_CTRL_STEERING_RX_FOLLOWS_TX 1
-
+#define VIRTIO_NET_CTRL_RFS    4
+ #define VIRTIO_NET_CTRL_RFS_VQ_PAIRS_SET        0
+ #define VIRTIO_NET_CTRL_RFS_VQ_PAIRS_MIN        1
+ #define VIRTIO_NET_CTRL_RFS_VQ_PAIRS_MAX        0x8000
 
 #define DEFINE_VIRTIO_NET_FEATURES(_state, _field) \
         DEFINE_VIRTIO_COMMON_FEATURES(_state, _field), \
