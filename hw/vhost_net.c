@@ -230,7 +230,7 @@ bool vhost_net_query(VHostNetState *net, VirtIODevice *dev)
 
 int vhost_net_start(struct vhost_net *net,
                     VirtIODevice *dev,
-		int vq_index)
+                    int vq_index)
 {
     return -ENOSYS;
 }

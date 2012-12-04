@@ -620,7 +620,7 @@ static int vhost_virtqueue_init(struct vhost_dev *dev,
 {
     target_phys_addr_t s, l, a;
     int r;
-    int vhost_vq_index = (idx > 2 ? idx - 1 : idx) % dev->nvqs;
+    int vhost_vq_index = idx % dev->nvqs;
     struct vhost_vring_file file = {
         .index = vhost_vq_index
     };
@@ -718,7 +718,7 @@ static void vhost_virtqueue_cleanup(struct vhost_dev *dev,
                                     unsigned idx)
 {
     struct vhost_vring_state state = {
-        .index = (idx > 2 ? idx - 1 : idx) % dev->nvqs,
+        .index = idx % dev->nvqs,
     };
     int r;
     r = ioctl(dev->control, VHOST_GET_VRING_BASE, &state);
